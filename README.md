@@ -1,6 +1,20 @@
 # Elit3 Crash Guard
 
-Protection layer that blocks crash methods
+Protection layer that blocks crash methods.
+
+## What it detects
+
+- **Spoofed rappel task** - players running `TASK_HELI_PASSENGER_RAPPEL` outside a
+  helicopter (the crash vector behind the recent ScEvent sync issues).
+- **Unauthorized entity spawns** - any client-created entity that is not GTA
+  population is cancelled before it ever exists, and the player is removed.
+  Server-side script spawns and normal GTA traffic pass untouched.
+- **Entity spawn floods** - per-player rate limits on ped, vehicle and object
+  creation with automatic cleanup of recently spawned entities on trigger.
+- **Forged explosion packets** - invalid explosion types or out-of-world
+  coordinates, plus explosion spam rate limiting.
+- **Corrupted ped variations** - victims of variation-corruption crashes get their
+  nearby peds silently repaired client-side (no punishment involved).
 
 Every action also prints to the server console and can optionally be mirrored to a
 Discord webhook.

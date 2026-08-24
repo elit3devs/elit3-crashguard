@@ -4,6 +4,8 @@ local GetPlayerName            = GetPlayerName
 local GetPlayerIdentifierByType = GetPlayerIdentifierByType
 local GetVehiclePedIsIn        = GetVehiclePedIsIn
 local GetVehicleType           = GetVehicleType
+local GetEntityPopulationType  = GetEntityPopulationType
+local GetEntityModel           = GetEntityModel
 local GetPedSpecificTaskType   = GetPedSpecificTaskType
 local GetEntityType            = GetEntityType
 local GetEntityOwner           = GetEntityOwner
@@ -40,6 +42,12 @@ local EXPLOSION_WINDOW    = 5000
 local EXPLOSION_HARD_MULT = 3
 local MAX_EXPLOSION_TYPE  = 80
 local MAX_WORLD_COORD     = 60000
+
+local POP_TYPES_GTA = {
+    [1] = true,
+    [2] = true,
+    [4] = true,
+}
 
 local WEBHOOK_URL  = GetConvar('ecg_discord_webhook', '')
 local WEBHOOK_NAME = GetConvar('ecg_discord_name', 'Elit3 Crash Guard')
@@ -115,10 +123,17 @@ CreateThread(function()
     end
 end)
 
-local function crashDrop(src, method, detail)
-    local name = GetPlayerName(src)
+local function describePlayer(src)
+    local name = GetPlayerName(src) or 'unknown'
+    local discordId = getDiscordId(src)
+    local discordLine = discordId and format('**Discord:** <@%s>\n', discordId) or '**Discord:** not linked\n'
 
-    if not name then
+    return format('**Player:** %s\n**Server ID:** %d\n%s**License:** %s',
+        name, src, discordLine, getLicense(src))
+end
+
+local function crashDrop(src, method, detail)
+    if not GetPlayerName(src) then
         return
     end
 
@@ -126,12 +141,8 @@ local function crashDrop(src, method, detail)
 
     DropPlayer(src, format('%s (%s)', KICK_REASON, kickId))
 
-    local discordId = getDiscordId(src)
-    local discordLine = discordId and format('**Discord:** <@%s>\n', discordId) or '**Discord:** not linked\n'
-
-    queueLog(format(
-        '**Player:** %s\n**Server ID:** %d\n%s**License:** %s\n**Method:** %s\n**Detail:** %s\n**Reference:** %s',
-        name, src, discordLine, getLicense(src), method, detail or 'n/a', kickId))
+    queueLog(format('%s\n**Method:** %s\n**Detail:** %s\n**Reference:** %s',
+        describePlayer(src), method, detail or 'n/a', kickId))
 end
 
 local function bumpRate(src, key, window)
@@ -225,7 +236,19 @@ AddEventHandler('entityCreating', function(entity)
         return
     end
 
-    local cfg = ENTITY_LIMITS[GetEntityType(entity)]
+    local etype = GetEntityType(entity)
+    local cfg = ENTITY_LIMITS[etype]
+
+    local pop = GetEntityPopulationType(entity)
+
+    if not POP_TYPES_GTA[pop] then
+        CancelEvent()
+        crashDrop(owner, 'Unauthorized entity spawn',
+            format('client-owned %s with population type %d, model %d (not script or GTA origin)',
+                cfg and cfg.key or 'entity', pop, GetEntityModel(entity)))
+        return
+    end
+
     if not cfg then
         return
     end
