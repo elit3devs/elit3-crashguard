@@ -7,10 +7,12 @@ local GetVehicleType           = GetVehicleType
 local GetEntityPopulationType  = GetEntityPopulationType
 local GetEntityModel           = GetEntityModel
 local GetPedSpecificTaskType   = GetPedSpecificTaskType
+local GetPedScriptTaskCommand  = GetPedScriptTaskCommand
 local GetEntityType            = GetEntityType
 local GetEntityOwner           = GetEntityOwner
 local DoesEntityExist          = DoesEntityExist
 local DeleteEntity             = DeleteEntity
+local ClearPedTasksImmediately = ClearPedTasksImmediately
 local DropPlayer               = DropPlayer
 local GetGameTimer             = GetGameTimer
 local GetConvar                = GetConvar
@@ -26,6 +28,15 @@ local KICK_REASON      = 'Attempt To Crash Players Detected'
 local RAPPEL_TASK_TYPE = 67
 local TASK_SLOT_COUNT  = 8
 local TASK_SWEEP_MS    = 500
+
+-- fivem#3722: a malicious client forces a crash-causing script task. The
+-- engine crash is reached via script task command 57 / 313 (or the matching
+-- specific task type 57). These command values never occur in normal play.
+local CRASH_TASK_SPECIFIC = 57
+local CRASH_TASK_CMD_1    = 57
+local CRASH_TASK_CMD_2    = 313
+local CRASH_TASK_SWEEP_MS = 100
+local CRASH_PERSIST_SWEEPS = 3
 
 local ENTITY_LIMITS = {
     [1] = { key = 'ped',     limit = 24, window = 5000 },
@@ -64,6 +75,7 @@ local kickCounter  = 0
 local rateBuckets  = {}
 local entityRings  = {}
 local floodFlagged = {}
+local crashTaskStrikes = {}
 
 local logQueue = {}
 
@@ -229,6 +241,51 @@ CreateThread(function()
     end
 end)
 
+-- fivem#3722 mitigation: clear (and on persistence, drop) the crash-causing
+-- script task before the engine reaches its crash path. We repair immediately
+-- but only kick after the offending task persists across several sweeps, so a
+-- genuine one-frame transient can never false-kick a legitimate player.
+CreateThread(function()
+    while true do
+        Wait(CRASH_TASK_SWEEP_MS)
+
+        local players = GetPlayers()
+
+        for i = 1, #players do
+            local src = tonumber(players[i])
+
+            if src then
+                local ped = GetPlayerPed(src)
+
+                if ped and ped > 0 then
+                    local specific = GetPedSpecificTaskType(ped, 0)
+                    local command = GetPedScriptTaskCommand(ped)
+
+                    local flagged = specific == CRASH_TASK_SPECIFIC
+                        or command == CRASH_TASK_CMD_1
+                        or command == CRASH_TASK_CMD_2
+
+                    if flagged then
+                        local strikes = (crashTaskStrikes[src] or 0) + 1
+                        crashTaskStrikes[src] = strikes
+
+                        if strikes >= CRASH_PERSIST_SWEEPS then
+                            crashTaskStrikes[src] = nil
+                            crashDrop(src, 'Forced crash task',
+                                format('specific=%d command=%d persisted for %d sweeps',
+                                    tostring(specific), tostring(command), CRASH_PERSIST_SWEEPS))
+                        else
+                            ClearPedTasksImmediately(ped)
+                        end
+                    else
+                        crashTaskStrikes[src] = nil
+                    end
+                end
+            end
+        end
+    end
+end)
+
 AddEventHandler('entityCreating', function(entity)
     local owner = GetEntityOwner(entity)
 
@@ -327,6 +384,7 @@ AddEventHandler('playerDropped', function()
     rateBuckets[src]  = nil
     entityRings[src]  = nil
     floodFlagged[src] = nil
+    crashTaskStrikes[src] = nil
 end)
 
 print('Successfully Loaded | Protection Active | Discord Logging '
