@@ -29,9 +29,6 @@ local RAPPEL_TASK_TYPE = 67
 local TASK_SLOT_COUNT  = 8
 local TASK_SWEEP_MS    = 500
 
--- fivem#3722: a malicious client forces a crash-causing script task. The
--- engine crash is reached via script task command 57 / 313 (or the matching
--- specific task type 57). These command values never occur in normal play.
 local CRASH_TASK_SPECIFIC = 57
 local CRASH_TASK_CMD_1    = 57
 local CRASH_TASK_CMD_2    = 313
@@ -241,10 +238,6 @@ CreateThread(function()
     end
 end)
 
--- fivem#3722 mitigation: clear (and on persistence, drop) the crash-causing
--- script task before the engine reaches its crash path. We repair immediately
--- but only kick after the offending task persists across several sweeps, so a
--- genuine one-frame transient can never false-kick a legitimate player.
 CreateThread(function()
     while true do
         Wait(CRASH_TASK_SWEEP_MS)
