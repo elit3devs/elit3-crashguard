@@ -16,7 +16,6 @@ local ClearPedTasksImmediately = ClearPedTasksImmediately
 local DropPlayer               = DropPlayer
 local GetGameTimer             = GetGameTimer
 local GetConvar                = GetConvar
-local GetConvarInt             = GetConvarInt
 local PerformHttpRequest       = PerformHttpRequest
 
 local format = string.format
@@ -62,14 +61,7 @@ local WEBHOOK_URL  = GetConvar('ecg_discord_webhook', '')
 local WEBHOOK_NAME = GetConvar('ecg_discord_name', 'Elit3 Crash Guard')
 
 local function isOneSyncEnabled()
-    local raw = tostring(GetConvar('onesync', 'off')):lower()
-    if raw == 'on' or raw == 'infinity' or raw == '1' or raw == 'true' or raw == 'yes' then
-        return true
-    end
-    if GetConvarInt('onesync', 0) == 1 then
-        return true
-    end
-    return false
+    return type(GetEntityOwner) == 'function' and type(GetEntityPopulationType) == 'function'
 end
 
 if not isOneSyncEnabled() then
