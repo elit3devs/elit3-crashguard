@@ -2,17 +2,13 @@
 
 Protection layer that blocks crash methods
 
-Every action also prints to the server console and can optionally be mirrored to a
-Discord webhook.
-
 ## Requirements
 
 - **OneSync** enabled (`set onesync on` / `infinity` in your server.cfg) - the entity
   events and mirrored ped natives this resource relies on only exist under OneSync.
   
 - Recommended: update **ox_lib** to v3.32.1 or newer if you use it. Older releases
-  contain a separate proximity-crash vulnerability documented in
-  [fivem#3727](https://github.com/citizenfx/fivem/issues/3727).
+  contain a separate proximity-crash vulnerability
 
 ---
 
